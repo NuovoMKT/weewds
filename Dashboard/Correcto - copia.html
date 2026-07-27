@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Redes Sociales - Grupo Talse</title>
+
+<!-- Cargamos Chart.js para las gráficas -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Librería para leer archivos Excel (.xlsx) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- Librerías de captura e impresión para forzar 1 sola página perfecta -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+:root {
+--green-primary: #0d5c2d;
+--green-light: #e8f5e9;
+--bg-color: #f4f6f8;
+--card-bg: #ffffff;
+--text-main: #333333;
+--text-muted: #666666;
+--border-color: #eaeaea;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+body { display: flex; background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; }
+
+/* Sidebar */
+.sidebar { width: 250px; background-color: var(--card-bg); padding: 20px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.1em; margin-bottom: 30px; }
+.logo-icon { background: var(--green-primary); color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; justify-content: center; align-items: center; font-size: 1.2em; overflow: hidden; }
+.menu-item { padding: 12px 15px; margin-bottom: 5px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-weight: 500; transition: 0.2s; }
+.menu-item:hover { background-color: #f0f0f0; }
+.menu-item.active { background-color: var(--green-light); color: var(--green-primary); }
+.promo-card { margin-top: auto; background-color: var(--green-primary); color: white; padding: 20px; border-radius: 12px; }
+.promo-card button { background: white; color: var(--green-primary); border: none; padding: 8px 12px; border-radius: 6px; margin-top: 10px; cursor: pointer; font-weight: bold; width: 100%; }
+
+/* Contenido Principal */
+.main-content { flex: 1; padding: 30px; overflow-y: auto; }
+
+/* Header & Filtros */
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+.header h1 { font-size: 1.8em; }
+.user-profile { display: flex; align-items: center; gap: 15px; }
+.avatar { background-color: var(--green-primary); color: white; padding: 10px; border-radius: 50%; font-weight: bold; }
+
+.filters { display: flex; gap: 15px; margin-bottom: 25px; align-items: center; background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); }
+select { padding: 8px 15px; border: 1px solid var(--border-color); border-radius: 6px; outline: none; background: white; font-size: 1em; }
+
+/* Botones de Acción Superior */
+.action-buttons { margin-left: auto; display: flex; gap: 10px; }
+.btn-pdf { background: white; color: var(--green-primary); border: 2px solid var(--green-primary); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+.btn-pdf:hover { background: var(--green-primary); color: white; }
+.btn-share { background: white; color: #1976D2; border: 2px solid #1976D2; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+.btn-share:hover { background: #1976D2; color: white; }
+
+/* VISTA DASHBOARD (Gráficas) */
+.grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+
+.card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
+.card-header { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.85em; color: var(--text-muted); width: 100%; }
+.card-header span.icon { font-size: 1.5em; }
+.card-value { font-size: 1.8em; font-weight: bold; width: 100%; }
+
+.chart-container { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; text-align: center;}
+.chart-container h3 { font-size: 1em; margin-bottom: 15px; font-weight: 500; }
+.canvas-wrapper { position: relative; height: 200px; width: 100%; display: flex; justify-content: center; }
+.canvas-bar-wrapper { position: relative; height: 300px; width: 100%; }
+
+/* CONTENEDORES INTERNOS */
+.box-container { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 20px;}
+.edit-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+.edit-table th { background: var(--green-light); color: var(--green-primary); text-align: left; padding: 12px; border: 1px solid var(--border-color); }
+.edit-table td { padding: 10px; border: 1px solid var(--border-color); }
+.edit-table input[type="text"], .edit-table input[type="number"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
+.edit-table input[type="color"] { width: 50px; height: 35px; border: none; cursor: pointer; border-radius: 4px; padding: 0;}
+.input-readonly { background-color: #f0f0f0; color: #666; font-weight: bold; cursor: not-allowed; }
+.btn-save { background: var(--green-primary); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 1.1em; font-weight: bold; width: 100%; }
+.btn-save:hover { background: #0a4723; }
+
+.hide { display: none !important; }
+
+.cost-row { display: flex; justify-content: space-between; font-size: 1.1em; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; text-align: left; }
+.cost-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.cost-value { color: var(--green-primary); font-weight: bold; }
+
+#bannerCompartido { background-color: #FFF9C4; border: 1px solid #FBC02D; color: #F57F17; padding: 10px; text-align: center; font-weight: bold; border-radius: 6px; margin-bottom: 20px; display: none; }
+</style>
+</head>
+<body>
+
+<div class="sidebar" id="sidebar">
+<div class="logo">
+<div class="logo-icon" id="logoIconContainer">🌿</div>
+<div>
+<div>Grupo Talse</div>
+<div style="font-size: 0.7em; font-weight: normal; color: var(--text-muted);">Restaurantes</div>
+</div>
+</div>
+
+<div class="menu-item active" id="navDashboard" onclick="cambiarVista('dashboard')">📊 Ver Dashboard</div>
+<div class="menu-item" id="navEdit" onclick="cambiarVista('edit')">📥 Cargar Datos (Excel)</div>
+<div class="menu-item" id="navConfig" onclick="cambiarVista('config')">⚙️ Configuración (Colores)</div>
+
+<div style="margin-top: 20px; font-size: 0.7em; font-weight: bold; color: var(--text-muted);">OTRAS OPCIONES</div>
+<div class="menu-item">📝 Publicaciones</div>
+<div class="menu-item">👥 Comunidad</div>
+<div class="menu-item">📈 Reportes</div>
+
+<div class="promo-card">
+<p style="font-size: 0.9em;">Impulsa tu marca y conecta más.</p>
+<button>Ver recomendaciones →</button>
+</div>
+</div>
+
+<div class="main-content" id="mainContent">
+<div class="header">
+<h1>Dashboard de Redes Sociales</h1>
+<div class="user-profile">
+<span>🔔</span>
+<div class="avatar">MR</div>
+<div style="font-size: 0.9em;">
+<strong>Melvin Rodríguez Cruz</strong><br>
+<span style="color: var(--text-muted);">Marketing Digital</span>
+</div>
+</div>
+</div>
+
+<!-- Banner de enlace compartido -->
+<div id="bannerCompartido">👀 Estás viendo un reporte compartido en modo lectura.</div>
+
+<!-- Filtros Comunes -->
+<div class="filters">
+<span style="font-weight: 500;">Resumen mensual</span>
+<select id="mesSelect" onchange="actualizarPantalla()">
+<option value="Enero">Enero</option>
+<option value="Febrero">Febrero</option>
+<option value="Marzo">Marzo</option>
+<option value="Abril">Abril</option>
+<option value="Mayo">Mayo</option>
+<option value="Junio">Junio</option>
+<option value="Julio">Julio</option>
+<option value="Agosto">Agosto</option>
+<option value="Septiembre">Septiembre</option>
+<option value="Octubre">Octubre</option>
+<option value="Noviembre">Noviembre</option>
+<option value="Diciembre">Diciembre</option>
+</select>
+
+<select id="marcaSelect" onchange="actualizarPantalla()">
+<option value="Todas">Todas las marcas</option>
+<option value="Mi Ranchito">Mi Ranchito</option>
+<option value="El Zócalo">El Zócalo</option>
+<option value="Nani Café">Nani Café</option>
+<option value="Setenta Grados">Setenta Grados</option>
+<option value="La Sureña">La Sureña</option>
+</select>
+
+<div class="action-buttons" id="actionButtons">
+<button class="btn-pdf" onclick="exportarAPDF()">📥 Exportar PDF</button>
+<button class="btn-share" onclick="compartirURL()">🔗 Compartir</button>
+</div>
+</div>
+
+<!-- ================= CONTENEDOR DASHBOARD ================= -->
+<div id="dashboardContainer">
+<div class="grid-5">
+<div class="card"><div class="card-header"><span class="icon">📘</span> Seguidores FB</div><div class="card-value" id="val_fb">0</div></div>
+<div class="card"><div class="card-header"><span class="icon">📸</span> Seguidores IG</div><div class="card-value" id="val_ig">0</div></div>
+<div class="card"><div class="card-header"><span class="icon">🤍</span> Interacciones</div><div class="card-value" id="val_int">0</div></div>
+<div class="card"><div class="card-header"><span class="icon">💬</span> Conversaciones</div><div class="card-value" id="val_conv">0</div></div>
+<div class="card"><div class="card-header"><span class="icon">📢</span> Inversión total</div><div class="card-value" id="val_inv">0</div></div>
+</div>
+
+<div class="grid-4">
+<div class="card"><div class="card-header"><span class="icon">📘</span> Inversión pauta FB</div><div class="card-value" id="val_inv_fb">0</div></div>
+<div class="card"><div class="card-header"><span class="icon">📸</span> Inversión pauta IG</div><div class="card-value" id="val_inv_ig">0</div></div>
+<div class="card"><div class="card-header"><span class="icon">🤍</span> Inversión pauta Interacciones</div><div class="card-value" id="val_inv_int">0</div></div>
+<div class="card"><div class="card-header"><span class="icon">💬</span> Inversión pauta Conv.</div><div class="card-value" id="val_inv_conv">0</div></div>
+</div>
+
+<div class="grid-3">
+<div class="chart-container"><h3>Seguidores orgánicos vs pautas FB</h3><div class="canvas-wrapper"><canvas id="donutFB"></canvas></div></div>
+<div class="chart-container"><h3>Seguidores orgánicos vs pautas IG</h3><div class="canvas-wrapper"><canvas id="donutIG"></canvas></div></div>
+
+<div class="chart-container" style="display: flex; flex-direction: column; justify-content: center; padding: 30px;">
+<h3 style="margin-bottom: 25px;">Costo por resultado</h3>
+<div class="cost-row"><strong>Costo por seguidor FB:</strong> <span class="cost-value" id="val_costo_fb">0</span></div>
+<div class="cost-row"><strong>Costo por seguidor IG:</strong> <span class="cost-value" id="val_costo_ig">0</span></div>
+<div class="cost-row"><strong>Costo por Conversación:</strong> <span class="cost-value" id="val_costo_conv">0</span></div>
+</div>
+</div>
+
+<div class="grid-2">
+<div class="chart-container">
+<h3 style="margin-bottom: 5px;">Crecimiento vs meta por marca (Facebook)</h3>
+<p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 15px;">📈 Crecimiento &nbsp;|&nbsp; 🎯 Meta</p>
+<div class="canvas-bar-wrapper"><canvas id="barChartFB"></canvas></div>
+</div>
+<div class="chart-container">
+<h3 style="margin-bottom: 5px;">Crecimiento vs meta por marca (Instagram)</h3>
+<p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 15px;">📈 Crecimiento &nbsp;|&nbsp; 🎯 Meta</p>
+<div class="canvas-bar-wrapper"><canvas id="barChartIG"></canvas></div>
+</div>
+</div>
+</div>
+
+<!-- ================= CONTENEDOR DE IMPORTACIÓN ================= -->
+<div id="editContainer" class="box-container hide">
+<h2 style="margin-bottom: 15px; color: var(--green-primary);">Actualizar Información</h2>
+
+<div style="background: var(--green-light); padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #c8e6c9;">
+  <h3 style="color: var(--green-primary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;"><span>📥</span> Carga Rápida desde Excel</h3>
+  <p style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 15px;">Sube tu archivo de Excel para rellenar automáticamente la información. <strong>El sistema leerá estrictamente los datos de la pestaña llamada "Dashboard" y mapeará los meses automáticamente (ej. ENE -> Enero).</strong></p>
+  <input type="file" id="inp_excel_upload" accept=".xlsx, .xls" style="padding: 10px; border: 1px dashed var(--green-primary); border-radius: 6px; width: 100%; background: white; cursor: pointer;" onchange="importarDesdeExcel(event)">
+</div>
+
+<p id="mensajeExito" style="color: green; text-align: center; margin-top: 10px; font-weight: bold; display: none;">¡Datos importados y guardados correctamente!</p>
+</div>
+
+<!-- ================= CONTENEDOR DE CONFIGURACIÓN ================= -->
+<div id="configContainer" class="box-container hide">
+<h2 style="margin-bottom: 15px; color: var(--green-primary);">Configuración Visual</h2>
+<p style="margin-bottom: 20px; color: var(--text-muted);">Personaliza los colores de las gráficas de barra horizontales para identificar cada marca fácilmente.</p>
+
+<table class="edit-table" style="max-width: 600px;">
+<tr><th>Marca</th><th>Color Crecimiento</th><th>Color Meta</th></tr>
+<tr><td><strong>Mi Ranchito</strong></td><td><input type="color" id="cfg_crec_0"></td><td><input type="color" id="cfg_meta_0"></td></tr>
+<tr><td><strong>El Zócalo</strong></td><td><input type="color" id="cfg_crec_1"></td><td><input type="color" id="cfg_meta_1"></td></tr>
+<tr><td><strong>Nani Café</strong></td><td><input type="color" id="cfg_crec_2"></td><td><input type="color" id="cfg_meta_2"></td></tr>
+<tr><td><strong>Setenta Grados</strong></td><td><input type="color" id="cfg_crec_3"></td><td><input type="color" id="cfg_meta_3"></td></tr>
+<tr><td><strong>La Sureña</strong></td><td><input type="color" id="cfg_crec_4"></td><td><input type="color" id="cfg_meta_4"></td></tr>
+</table>
+
+<h3 style="margin-top: 30px; margin-bottom: 10px; color: var(--green-primary);">Logo Personalizado</h3>
+<p style="margin-bottom: 15px; color: var(--text-muted);">Sube una imagen (PNG, JPG) para cambiar el logo del Sidebar.</p>
+<input type="file" id="inp_logo_upload" accept="image/*" style="margin-bottom: 20px; padding: 10px; border: 1px dashed var(--green-primary); border-radius: 6px; width: 100%; max-width: 600px; background: white; cursor: pointer;">
+
+<button class="btn-save" onclick="guardarConfiguracion()">🎨 Aplicar y Guardar Colores</button>
+<p id="mensajeExitoConfig" style="color: green; text-align: center; margin-top: 10px; font-weight: bold; display: none;">¡Ajustes aplicados y guardados!</p>
+</div>
+</div>
+
+<script>
+// -------------------------------------------------------------
+// 1. GESTIÓN DE COLORES Y LOGO (CONFIGURACIÓN GLOBAL)
+// -------------------------------------------------------------
+const defaultConfigColores = [
+{ crec: '#4CAF50', meta: '#1B5E20' },
+{ crec: '#2196F3', meta: '#0D47A1' },
+{ crec: '#FFC107', meta: '#FF6F00' },
+{ crec: '#9C27B0', meta: '#4A148C' },
+{ crec: '#F44336', meta: '#B71C1C' }
+];
+
+let appConfig = JSON.parse(localStorage.getItem('dashboardTalseConfig')) || defaultConfigColores;
+
+function cargarLogoPersonalizado() {
+  const logoBase64 = localStorage.getItem('dashboardTalseLogo');
+  if (logoBase64) {
+    const contenedor = document.getElementById('logoIconContainer');
+    contenedor.innerHTML = `<img src="${logoBase64}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+    contenedor.style.background = 'transparent';
+  }
+}
+
+// -------------------------------------------------------------
+// 2. GESTIÓN DE DATOS MENSUALES
+// -------------------------------------------------------------
+const plantillaDatos = {
+fb_followers: "0", ig_followers: "0",
+interactions: "0", conversations: "0",
+inversion: "C$ 0",
+inv_fb: "C$ 0", inv_ig: "C$ 0", inv_int: "C$ 0", inv_conv: "C$ 0",
+costo_fb: "C$ 0.00", costo_ig: "C$ 0.00", costo_conv: "C$ 0.00",
+donut_fb_nums: [0, 0], donut_ig_nums: [0, 0],
+donut_fb: [50, 50], donut_ig: [50, 50],
+bar_crecimiento_fb: [0, 0, 0, 0, 0], bar_meta_fb: [0, 0, 0, 0, 0],
+bar_crecimiento_ig: [0, 0, 0, 0, 0], bar_meta_ig: [0, 0, 0, 0, 0]
+};
+
+const datosIniciales = {
+"Enero": {
+"Mi Ranchito": {
+fb_followers: "425.8K", ig_followers: "32.4K",
+interactions: "2,384", conversations: "48",
+inversion: "C$ 140,000",
+inv_fb: "C$ 58,000", inv_ig: "C$ 42,000",
+inv_int: "C$ 15,000", inv_conv: "C$ 25,000",
+costo_fb: "C$ 0.22", costo_ig: "C$ 1.29", costo_conv: "C$ 520.83",
+donut_fb_nums: [425800, 170300], donut_ig_nums: [32400, 13000],
+donut_fb: [60, 40], donut_ig: [60, 40],
+bar_crecimiento_fb: [38.5, 27.3, 15.7, 20.6, 12.8], bar_meta_fb: [45.0, 35.0, 25.0, 30.0, 20.0],
+bar_crecimiento_ig: [10.2, 8.5, 5.0, 7.2, 4.1], bar_meta_ig: [12.0, 10.0, 8.0, 9.0, 6.0]
+}
+}
+};
+
+let baseDeDatos = JSON.parse(localStorage.getItem('dashboardTalseDatos')) || datosIniciales;
+let chartDonutFB, chartDonutIG, chartBarFB, chartBarIG;
+let datosCompartidosTemporales = null;
+
+const marcasArray = ['Mi Ranchito', 'El Zócalo', 'Nani Café', 'Setenta Grados', 'La Sureña'];
+const mesesValidos = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+// --- FUNCIONES INTELIGENTES DE PARSEO Y AUTOFORMATO ---
+function parseCustomNumber(val) {
+    if (val === undefined || val === null || val === "") return 0;
+    if (typeof val === 'number') return val;
+    let str = String(val).toUpperCase().trim();
+    let mult = 1;
+    if (str.endsWith('K')) { mult = 1000; str = str.replace('K', ''); }
+    else if (str.endsWith('M')) { mult = 1000000; str = str.replace('M', ''); }
+    str = str.replace(/[^0-9.-]/g, ''); 
+    let num = parseFloat(str);
+    return isNaN(num) ? 0 : num * mult;
+}
+
+function parseCustomCurrency(val) {
+    if (!val) return 0;
+    let str = String(val).replace(/[^0-9.-]/g, '');
+    let num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+}
+
+function formatCustomK(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace('.0', '') + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1).replace('.0', '') + 'K';
+    return num.toLocaleString('en-US'); 
+}
+
+function normalizarTexto(texto) {
+    if (!texto) return "";
+    return String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function encontrarCoincidencia(input, array) {
+    let normInput = normalizarTexto(input);
+    for (let item of array) {
+        if (normalizarTexto(item) === normInput) return item;
+    }
+    return null;
+}
+
+function parsearMes(mesInput) {
+    if (!mesInput) return null;
+    let normMes = normalizarTexto(mesInput);
+    
+    if (normMes.startsWith("ene")) return "Enero";
+    if (normMes.startsWith("feb")) return "Febrero";
+    if (normMes.startsWith("mar")) return "Marzo";
+    if (normMes.startsWith("abr")) return "Abril";
+    if (normMes.startsWith("may")) return "Mayo";
+    if (normMes.startsWith("jun")) return "Junio";
+    if (normMes.startsWith("jul")) return "Julio";
+    if (normMes.startsWith("ago")) return "Agosto";
+    if (normMes.startsWith("sep")) return "Septiembre";
+    if (normMes.startsWith("oct")) return "Octubre";
+    if (normMes.startsWith("nov")) return "Noviembre";
+    if (normMes.startsWith("dic")) return "Diciembre";
+    
+    return null;
+}
+
+// --- GENERADOR DE LA SUMATORIA PARA "TODAS" ---
+function generarDatosTodas(mes) {
+    let consol = JSON.parse(JSON.stringify(plantillaDatos));
+    let sum_fb = 0, sum_ig = 0, sum_int = 0, sum_conv = 0;
+    let sum_inv_fb = 0, sum_inv_ig = 0, sum_inv_int = 0, sum_inv_conv = 0;
+    let sum_donut_fb_total = 0, sum_donut_fb_pau = 0;
+    let sum_donut_ig_total = 0, sum_donut_ig_pau = 0;
+
+    let sum_costo_fb = 0, count_costo_fb = 0;
+    let sum_costo_ig = 0, count_costo_ig = 0;
+    let sum_costo_conv = 0, count_costo_conv = 0;
+
+    marcasArray.forEach((marca, index) => {
+        let d = baseDeDatos[mes] && baseDeDatos[mes][marca] ? baseDeDatos[mes][marca] : plantillaDatos;
+        
+        sum_fb += parseCustomNumber(d.fb_followers);
+        sum_ig += parseCustomNumber(d.ig_followers);
+        sum_int += parseCustomNumber(d.interactions);
+        sum_conv += parseCustomNumber(d.conversations);
+
+        sum_inv_fb += parseCustomCurrency(d.inv_fb);
+        sum_inv_ig += parseCustomCurrency(d.inv_ig);
+        sum_inv_int += parseCustomCurrency(d.inv_int);
+        sum_inv_conv += parseCustomCurrency(d.inv_conv);
+
+        let c_fb = parseCustomCurrency(d.costo_fb);
+        if (c_fb > 0) { sum_costo_fb += c_fb; count_costo_fb++; }
+
+        let c_ig = parseCustomCurrency(d.costo_ig);
+        if (c_ig > 0) { sum_costo_ig += c_ig; count_costo_ig++; }
+
+        let c_conv = parseCustomCurrency(d.costo_conv);
+        if (c_conv > 0) { sum_costo_conv += c_conv; count_costo_conv++; }
+
+        sum_donut_fb_total += (d.donut_fb_nums ? d.donut_fb_nums[0] : 0);
+        sum_donut_fb_pau += (d.donut_fb_nums ? d.donut_fb_nums[1] : 0);
+        sum_donut_ig_total += (d.donut_ig_nums ? d.donut_ig_nums[0] : 0);
+        sum_donut_ig_pau += (d.donut_ig_nums ? d.donut_ig_nums[1] : 0);
+
+        consol.bar_crecimiento_fb[index] = d.bar_crecimiento_fb ? d.bar_crecimiento_fb[index] : 0;
+        consol.bar_meta_fb[index] = d.bar_meta_fb ? d.bar_meta_fb[index] : 0;
+        consol.bar_crecimiento_ig[index] = d.bar_crecimiento_ig ? d.bar_crecimiento_ig[index] : 0;
+        consol.bar_meta_ig[index] = d.bar_meta_ig ? d.bar_meta_ig[index] : 0;
+    });
+
+    consol.fb_followers = formatCustomK(sum_fb);
+    consol.ig_followers = formatCustomK(sum_ig);
+    consol.interactions = sum_int.toLocaleString('en-US');
+    consol.conversations = sum_conv.toLocaleString('en-US');
+
+    consol.inv_fb = "C$ " + sum_inv_fb.toLocaleString('en-US');
+    consol.inv_ig = "C$ " + sum_inv_ig.toLocaleString('en-US');
+    consol.inv_int = "C$ " + sum_inv_int.toLocaleString('en-US');
+    consol.inv_conv = "C$ " + sum_inv_conv.toLocaleString('en-US');
+    
+    let total_inv = sum_inv_fb + sum_inv_ig + sum_inv_int + sum_inv_conv;
+    consol.inversion = "C$ " + total_inv.toLocaleString('en-US');
+
+    let avg_costo_fb = count_costo_fb > 0 ? (sum_costo_fb / count_costo_fb) : 0;
+    consol.costo_fb = "C$ " + avg_costo_fb.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    let avg_costo_ig = count_costo_ig > 0 ? (sum_costo_ig / count_costo_ig) : 0;
+    consol.costo_ig = "C$ " + avg_costo_ig.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    let avg_costo_conv = count_costo_conv > 0 ? (sum_costo_conv / count_costo_conv) : 0;
+    consol.costo_conv = "C$ " + avg_costo_conv.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    consol.donut_fb_nums = [sum_donut_fb_total, sum_donut_fb_pau];
+    consol.donut_ig_nums = [sum_donut_ig_total, sum_donut_ig_pau];
+
+    let pct_fb_pau = sum_donut_fb_total > 0 ? Math.round((sum_donut_fb_pau / sum_donut_fb_total) * 100) : 0;
+    consol.donut_fb = [100 - pct_fb_pau, pct_fb_pau];
+
+    let pct_ig_pau = sum_donut_ig_total > 0 ? Math.round((sum_donut_ig_pau / sum_donut_ig_total) * 100) : 0;
+    consol.donut_ig = [100 - pct_ig_pau, pct_ig_pau];
+
+    return consol;
+}
+
+// --- PLUGINS PARA CHART.JS ---
+const centroTextoDona = {
+id: 'centroTextoDona',
+beforeDraw: function(chart) {
+if (chart.config.type !== 'doughnut') return;
+let ctx = chart.ctx;
+let width = chart.width;
+let height = chart.height;
+
+ctx.restore();
+let fontSize = (height / 100).toFixed(2);
+ctx.font = "bold " + fontSize + "em 'Segoe UI', Tahoma, sans-serif";
+ctx.textBaseline = "middle";
+ctx.fillStyle = "#333333";
+
+let data = chart.data.datasets[0].data;
+if(data && data.length > 0) {
+let max = Math.max(...data);
+let total = data.reduce((a, b) => a + b, 0);
+let pct = total > 0 ? Math.round((max / total) * 100) + "%" : "0%";
+
+let textX = Math.round((width - ctx.measureText(pct).width) / 2);
+let textY = height / 2;
+
+ctx.fillText(pct, textX, textY);
+}
+ctx.save();
+}
+};
+
+const mostrarValoresBarras = {
+    id: 'mostrarValoresBarras',
+    afterDatasetsDraw(chart) {
+        if (chart.config.type !== 'bar') return;
+        const ctx = chart.ctx;
+        chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            const icono = (i === 0) ? '📈' : '🎯'; 
+            meta.data.forEach((bar, index) => {
+                const valor = dataset.data[index];
+                if (valor !== undefined && valor !== null && valor !== "") {
+                    ctx.fillStyle = '#333333';
+                    ctx.font = 'bold 12px "Segoe UI", Tahoma, sans-serif';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${icono} ${valor}`, bar.x + 5, bar.y); 
+                }
+            });
+        });
+    }
+};
+
+function initCharts() {
+const ctxFb = document.getElementById('donutFB').getContext('2d');
+chartDonutFB = new Chart(ctxFb, {
+type: 'doughnut',
+data: { labels: ['Orgánicos', 'Pauta'], datasets: [{ data: [0,0], backgroundColor: ['#0D47A1', '#FF9800'] }] },
+options: { responsive: true, maintainAspectRatio: false, cutout: '70%' },
+plugins: [centroTextoDona]
+});
+
+const ctxIg = document.getElementById('donutIG').getContext('2d');
+chartDonutIG = new Chart(ctxIg, {
+type: 'doughnut',
+data: { labels: ['Orgánicos', 'Pauta'], datasets: [{ data: [0,0], backgroundColor: ['#C2185B', '#AEEA00'] }] },
+options: { responsive: true, maintainAspectRatio: false, cutout: '70%' },
+plugins: [centroTextoDona]
+});
+
+const ctxBarFB = document.getElementById('barChartFB').getContext('2d');
+chartBarFB = new Chart(ctxBarFB, {
+type: 'bar',
+data: { labels: marcasArray, datasets: [ { label: 'Crecimiento', data: [0,0,0,0,0] }, { label: 'Meta', data: [0,0,0,0,0] } ] },
+options: { 
+    indexAxis: 'y', 
+    responsive: true, 
+    maintainAspectRatio: false, 
+    layout: { padding: { right: 55 } },
+    plugins: {
+        legend: { display: false }
+    }
+},
+plugins: [mostrarValoresBarras]
+});
+
+const ctxBarIG = document.getElementById('barChartIG').getContext('2d');
+chartBarIG = new Chart(ctxBarIG, {
+type: 'bar',
+data: { labels: marcasArray, datasets: [ { label: 'Crecimiento', data: [0,0,0,0,0] }, { label: 'Meta', data: [0,0,0,0,0] } ] },
+options: { 
+    indexAxis: 'y', 
+    responsive: true, 
+    maintainAspectRatio: false, 
+    layout: { padding: { right: 55 } },
+    plugins: {
+        legend: { display: false }
+    }
+},
+plugins: [mostrarValoresBarras]
+});
+}
+
+function aplicarColoresAGraficas() {
+let crecColors = appConfig.map(c => c.crec);
+let metaColors = appConfig.map(c => c.meta);
+
+chartBarFB.data.datasets[0].backgroundColor = crecColors;
+chartBarFB.data.datasets[1].backgroundColor = metaColors;
+
+chartBarIG.data.datasets[0].backgroundColor = crecColors;
+chartBarIG.data.datasets[1].backgroundColor = metaColors;
+}
+
+function obtenerDatosActuales() {
+const mesActual = document.getElementById('mesSelect').value;
+const marcaActual = document.getElementById('marcaSelect').value;
+
+if (datosCompartidosTemporales && datosCompartidosTemporales.m === mesActual && datosCompartidosTemporales.c === marcaActual) {
+return datosCompartidosTemporales.d;
+} else {
+document.getElementById('bannerCompartido').style.display = 'none';
+}
+
+if (!baseDeDatos[mesActual]) baseDeDatos[mesActual] = {};
+
+if (marcaActual === 'Todas') {
+    return generarDatosTodas(mesActual);
+}
+
+if (!baseDeDatos[mesActual][marcaActual]) baseDeDatos[mesActual][marcaActual] = JSON.parse(JSON.stringify(plantillaDatos));
+
+let datos = baseDeDatos[mesActual][marcaActual];
+if(!datos.bar_crecimiento_fb) datos.bar_crecimiento_fb = [0,0,0,0,0];
+if(!datos.bar_meta_fb) datos.bar_meta_fb = [0,0,0,0,0];
+if(!datos.bar_crecimiento_ig) datos.bar_crecimiento_ig = [0,0,0,0,0];
+if(!datos.bar_meta_ig) datos.bar_meta_ig = [0,0,0,0,0];
+if(!datos.costo_fb) { datos.costo_fb = "C$ 0.00"; datos.costo_ig = "C$ 0.00"; datos.costo_conv = "C$ 0.00"; }
+
+return datos;
+}
+
+function actualizarPantalla() {
+const datos = obtenerDatosActuales();
+
+document.getElementById('val_fb').innerText = datos.fb_followers || "0";
+document.getElementById('val_ig').innerText = datos.ig_followers || "0";
+document.getElementById('val_int').innerText = datos.interactions || "0";
+document.getElementById('val_conv').innerText = datos.conversations || "0";
+document.getElementById('val_inv').innerText = datos.inversion || "0";
+document.getElementById('val_inv_fb').innerText = datos.inv_fb || "0";
+document.getElementById('val_inv_ig').innerText = datos.inv_ig || "0";
+document.getElementById('val_inv_int').innerText = datos.inv_int || "0";
+document.getElementById('val_inv_conv').innerText = datos.inv_conv || "0";
+
+document.getElementById('val_costo_fb').innerText = datos.costo_fb || "C$ 0.00";
+document.getElementById('val_costo_ig').innerText = datos.costo_ig || "C$ 0.00";
+document.getElementById('val_costo_conv').innerText = datos.costo_conv || "C$ 0.00";
+
+chartDonutFB.data.datasets[0].data = datos.donut_fb; chartDonutFB.update();
+chartDonutIG.data.datasets[0].data = datos.donut_ig; chartDonutIG.update();
+
+chartBarFB.data.datasets[0].data = datos.bar_crecimiento_fb;
+chartBarFB.data.datasets[1].data = datos.bar_meta_fb;
+
+chartBarIG.data.datasets[0].data = datos.bar_crecimiento_ig;
+chartBarIG.data.datasets[1].data = datos.bar_meta_ig;
+
+aplicarColoresAGraficas();
+chartBarFB.update();
+chartBarIG.update();
+
+for(let i=0; i<5; i++){
+document.getElementById('cfg_crec_'+i).value = appConfig[i].crec;
+document.getElementById('cfg_meta_'+i).value = appConfig[i].meta;
+}
+}
+
+function guardarConfiguracion() {
+  for(let i=0; i<5; i++){
+    appConfig[i].crec = document.getElementById('cfg_crec_'+i).value;
+    appConfig[i].meta = document.getElementById('cfg_meta_'+i).value;
+  }
+  localStorage.setItem('dashboardTalseConfig', JSON.stringify(appConfig));
+
+  const inputLogo = document.getElementById('inp_logo_upload');
+  if (inputLogo.files && inputLogo.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      localStorage.setItem('dashboardTalseLogo', e.target.result);
+      cargarLogoPersonalizado();
+      finalizarGuardadoConfig();
+    };
+    reader.readAsDataURL(inputLogo.files[0]);
+  } else {
+    finalizarGuardadoConfig();
+  }
+}
+
+function finalizarGuardadoConfig() {
+  const msj = document.getElementById('mensajeExitoConfig');
+  msj.style.display = 'block';
+  setTimeout(() => { msj.style.display = 'none'; }, 3000);
+  actualizarPantalla();
+}
+
+function cambiarVista(vista) {
+document.getElementById('navDashboard').classList.remove('active');
+document.getElementById('navEdit').classList.remove('active');
+document.getElementById('navConfig').classList.remove('active');
+
+document.getElementById('dashboardContainer').classList.add('hide');
+document.getElementById('editContainer').classList.add('hide');
+document.getElementById('configContainer').classList.add('hide');
+
+if(vista === 'dashboard') {
+document.getElementById('navDashboard').classList.add('active');
+document.getElementById('dashboardContainer').classList.remove('hide');
+} else if (vista === 'edit') {
+document.getElementById('navEdit').classList.add('active');
+document.getElementById('editContainer').classList.remove('hide');
+} else if (vista === 'config') {
+document.getElementById('navConfig').classList.add('active');
+document.getElementById('configContainer').classList.remove('hide');
+}
+}
+
+// -------------------------------------------------------------
+// 3. IMPORTAR DESDE EXCEL
+// -------------------------------------------------------------
+function importarDesdeExcel(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            
+            const worksheet = workbook.Sheets['Dashboard'];
+            
+            if (!worksheet) {
+                alert("Error: No se encontró la pestaña 'Dashboard' en el archivo Excel.");
+                event.target.value = "";
+                return;
+            }
+            
+            const jsonRows = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: ""});
+            
+            let headerRowIndex = -1;
+            for(let i=0; i<10; i++) {
+                let rowJoined = jsonRows[i].join("").toLowerCase();
+                if (rowJoined.includes("marca") && rowJoined.includes("mes")) {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+
+            if (headerRowIndex === -1) {
+                alert("Error: No se detectaron las columnas 'Marca' y 'Mes'. Asegúrate de usar la plantilla original.");
+                event.target.value = "";
+                return;
+            }
+
+            const headers = jsonRows[headerRowIndex];
+            const superHeaders = headerRowIndex > 0 ? jsonRows[headerRowIndex - 1] : [];
+            const colMap = {};
+
+            for(let c=0; c<headers.length; c++) {
+                let colName = String(headers[c]).trim();
+                if (!colName && superHeaders[c]) {
+                    colName = String(superHeaders[c]).trim();
+                }
+                colMap[c] = normalizarTexto(colName);
+            }
+
+            let importados = 0;
+            let ultimoMes = null;
+            let ultimaMarca = null;
+
+            for(let r = headerRowIndex + 1; r < jsonRows.length; r++) {
+                let rowData = jsonRows[r];
+                if(!rowData || rowData.length === 0) continue;
+
+                let row = {};
+                for(let c=0; c<headers.length; c++) {
+                    let val = rowData[c];
+                    row[colMap[c]] = val !== undefined ? val : "";
+                }
+
+                let rawMarca = row[normalizarTexto("Marca")];
+                let rawMes = row[normalizarTexto("Mes")];
+
+                let marca = encontrarCoincidencia(rawMarca, marcasArray);
+                let mes = parsearMes(rawMes); 
+
+                if (marca && mes) {
+                    importados++;
+                    ultimoMes = mes;
+                    ultimaMarca = marca;
+
+                    if (!baseDeDatos[mes]) baseDeDatos[mes] = {};
+                    if (!baseDeDatos[mes][marca]) baseDeDatos[mes][marca] = JSON.parse(JSON.stringify(plantillaDatos));
+                    
+                    let d = baseDeDatos[mes][marca];
+                    
+                    let valFb = parseCustomNumber(row[normalizarTexto("Seguidores FB")]);
+                    d.fb_followers = formatCustomK(valFb);
+
+                    let valIg = parseCustomNumber(row[normalizarTexto("Seguidores IG")]);
+                    d.ig_followers = formatCustomK(valIg);
+
+                    let valInt = parseCustomNumber(row[normalizarTexto("Interacciones")]);
+                    d.interactions = valInt.toLocaleString('en-US');
+
+                    let valConv = parseCustomNumber(row[normalizarTexto("Conversaciones")]);
+                    d.conversations = valConv.toLocaleString('en-US');
+                    
+                    let inv_fb = parseCustomNumber(row[normalizarTexto("Inversión Pauta FB")]);
+                    d.inv_fb = "C$ " + inv_fb.toLocaleString('en-US');
+                    
+                    let inv_ig = parseCustomNumber(row[normalizarTexto("Inversión Pauta IG")]);
+                    d.inv_ig = "C$ " + inv_ig.toLocaleString('en-US');
+                    
+                    let inv_int = parseCustomNumber(row[normalizarTexto("Inversión Pauta Interacciones")]);
+                    d.inv_int = "C$ " + inv_int.toLocaleString('en-US');
+                    
+                    let inv_conv = parseCustomNumber(row[normalizarTexto("Inversión Pauta Conversaciones")]);
+                    d.inv_conv = "C$ " + inv_conv.toLocaleString('en-US');
+
+                    d.inversion = "C$ " + (inv_fb + inv_ig + inv_int + inv_conv).toLocaleString('en-US');
+                    
+                    let costo_fb_num = parseCustomNumber(row[normalizarTexto("Costo por seguidor FB")]);
+                    d.costo_fb = "C$ " + costo_fb_num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    
+                    let costo_ig_num = parseCustomNumber(row[normalizarTexto("Costo por seguidor IG")]);
+                    d.costo_ig = "C$ " + costo_ig_num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    
+                    let costo_conv_num = parseCustomNumber(row[normalizarTexto("Costo por Conversación")]);
+                    d.costo_conv = "C$ " + costo_conv_num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    
+                    let fb_total = parseCustomNumber(row[normalizarTexto("Cifra total FB")]);
+                    let fb_pauta = parseCustomNumber(row[normalizarTexto("Cifra Pauta FB")]);
+                    d.donut_fb_nums = [fb_total, fb_pauta];
+                    let pct_fb_pau = fb_total > 0 ? Math.round((fb_pauta / fb_total) * 100) : 0;
+                    d.donut_fb = [100 - pct_fb_pau, pct_fb_pau];
+                    
+                    let ig_total = parseCustomNumber(row[normalizarTexto("Cifra total IG")]);
+                    let ig_pauta = parseCustomNumber(row[normalizarTexto("Cifra Pauta IG")]);
+                    d.donut_ig_nums = [ig_total, ig_pauta];
+                    let pct_ig_pau = ig_total > 0 ? Math.round((ig_pauta / ig_total) * 100) : 0;
+                    d.donut_ig = [100 - pct_ig_pau, pct_ig_pau];
+                    
+                    let marcaIndex = marcasArray.indexOf(marca);
+                    if (marcaIndex !== -1) {
+                        d.bar_crecimiento_fb[marcaIndex] = parseCustomNumber(row[normalizarTexto("Crecimiento FB")]);
+                        d.bar_meta_fb[marcaIndex] = parseCustomNumber(row[normalizarTexto("Meta FB")]);
+                        d.bar_crecimiento_ig[marcaIndex] = parseCustomNumber(row[normalizarTexto("Crecimiento IG")]);
+                        d.bar_meta_ig[marcaIndex] = parseCustomNumber(row[normalizarTexto("Meta IG")]);
+                    }
+                }
+            }
+            
+            if (importados === 0) {
+                alert("El Excel fue leído, pero no se encontraron filas de datos válidas (Verifica que la Marca y el Mes estén escritos).");
+                event.target.value = "";
+                return;
+            }
+
+            localStorage.setItem('dashboardTalseDatos', JSON.stringify(baseDeDatos));
+            
+            if (ultimoMes) document.getElementById('mesSelect').value = ultimoMes;
+            if (document.getElementById('marcaSelect').value !== 'Todas' && ultimaMarca) {
+                 document.getElementById('marcaSelect').value = ultimaMarca;
+            }
+
+            cambiarVista('dashboard');
+            actualizarPantalla();
+            
+            alert(`¡Se importaron ${importados} registros exitosamente!`);
+            event.target.value = ""; 
+            
+        } catch(error) {
+            console.error(error);
+            alert("Hubo un error al procesar el Excel.");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// -------------------------------------------------------------
+// 4. EXPORTAR A PDF Y COMPARTIR URL
+// -------------------------------------------------------------
+function exportarAPDF() {
+if (document.getElementById('dashboardContainer').classList.contains('hide')) {
+cambiarVista('dashboard');
+}
+
+const actionButtons = document.getElementById('actionButtons');
+const elementoAExportar = document.getElementById('mainContent');
+
+actionButtons.style.display = 'none';
+
+const originalHeight = elementoAExportar.style.height;
+const originalMaxHeight = elementoAExportar.style.maxHeight;
+const originalOverflow = elementoAExportar.style.overflow;
+
+elementoAExportar.style.height = 'auto';
+elementoAExportar.style.maxHeight = 'none';
+elementoAExportar.style.overflow = 'visible';
+
+setTimeout(() => {
+html2canvas(elementoAExportar, {
+scale: 2,
+useCORS: true,
+backgroundColor: '#f4f6f8'
+}).then(canvas => {
+const imgData = canvas.toDataURL('image/jpeg', 1.0);
+const { jsPDF } = window.jspdf;
+const pdf = new jsPDF('landscape', 'mm', 'letter');
+
+const pdfWidth = pdf.internal.pageSize.getWidth();
+const pdfHeight = pdf.internal.pageSize.getHeight();
+
+const margin = 5;
+const availableWidth = pdfWidth - (margin * 2);
+const availableHeight = pdfHeight - (margin * 2);
+
+const ratio = Math.min(availableWidth / canvas.width, availableHeight / canvas.height);
+
+const imgWidth = canvas.width * ratio;
+const imgHeight = canvas.height * ratio;
+
+const marginX = (pdfWidth - imgWidth) / 2;
+const marginY = (pdfHeight - imgHeight) / 2;
+
+pdf.addImage(imgData, 'JPEG', marginX, marginY, imgWidth, imgHeight);
+
+const marca = document.getElementById('marcaSelect').value.replace(/\s+/g, '_');
+const mes = document.getElementById('mesSelect').value;
+pdf.save(`Reporte_${marca}_${mes}.pdf`);
+
+actionButtons.style.display = 'flex';
+elementoAExportar.style.height = originalHeight;
+elementoAExportar.style.maxHeight = originalMaxHeight;
+elementoAExportar.style.overflow = originalOverflow;
+});
+}, 100);
+}
+
+function compartirURL() {
+const mes = document.getElementById('mesSelect').value;
+const marca = document.getElementById('marcaSelect').value;
+const datos = baseDeDatos[mes][marca] || plantillaDatos;
+
+const info = { m: mes, c: marca, d: datos };
+
+try {
+const jsonStr = JSON.stringify(info);
+const b64 = btoa(encodeURIComponent(jsonStr));
+
+const rutaBase = window.location.origin !== "null" ? window.location.origin + window.location.pathname : window.location.pathname;
+const link = `${rutaBase}?share=${b64}`;
+
+if (navigator.clipboard && window.isSecureContext) {
+navigator.clipboard.writeText(link).then(() => {
+mostrarAvisoCompartir();
+}).catch(() => fallbackCopiar(link));
+} else {
+fallbackCopiar(link);
+}
+} catch (e) {
+alert("Error al generar el enlace.");
+}
+}
+
+function fallbackCopiar(texto) {
+let ta = document.createElement("textarea");
+ta.value = texto;
+ta.style.position = "fixed"; ta.style.left = "-999999px";
+document.body.appendChild(ta);
+ta.focus(); ta.select();
+try {
+document.execCommand('copy');
+mostrarAvisoCompartir();
+} catch (err) {
+prompt("Copia este enlace para compartir:", texto);
+}
+document.body.removeChild(ta);
+}
+
+function mostrarAvisoCompartir() {
+alert("¡Enlace generado y copiado al portapapeles!\n\nRECUERDA: Si estás usando esto en tu computadora (archivo local), la otra persona necesitará tener este archivo para abrir el enlace. Si lo subiste a internet, ¡funcionará perfecto para cualquiera!");
+}
+
+window.onload = function() {
+const params = new URLSearchParams(window.location.search);
+const shareCode = params.get('share');
+
+if (shareCode) {
+try {
+const info = JSON.parse(decodeURIComponent(atob(shareCode)));
+datosCompartidosTemporales = info;
+
+document.getElementById('mesSelect').value = info.m;
+document.getElementById('marcaSelect').value = info.c;
+document.getElementById('bannerCompartido').style.display = 'block';
+
+} catch(e) {
+console.error("Enlace no válido");
+}
+}
+
+initCharts();
+actualizarPantalla();
+cargarLogoPersonalizado();
+};
+</script>
+
+</body>
+</html>
